@@ -136,10 +136,88 @@ namespace NMEAClient
 
 				if (bytesRead > 0)
 				{
+                    string data = Encoding.ASCII.GetString(state.buffer, 0, bytesRead);
+
                     //// There might be more data, so store the data received so far.
                     //state.sb.Append(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
-                    Console.WriteLine(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
+                    Console.WriteLine(data);
                     //writeTo.WriteLine(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
+
+                    // parse the data into separate lines for decoding
+                    string[] nmeaLines = data.Split(new string[] { @"\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+                    foreach (string nmeaLine in nmeaLines)
+                    {
+                        string[] nmeaData = nmeaLine.Split(new char[] {','}, StringSplitOptions.None);
+
+                        if (nmeaLine.StartsWith("$PGHP"))
+                        {
+                            /*
+                             * Gatehouse wrapper
+                             * Format is (two lines, but the second line will be decoded by itself):
+                             * $PGH1,<msgtype>,<date format>,<country>,<region>,<pss>,<online data>,<cc>*hh<CR><LF>
+                             * <NMEA message>
+                                    <msgtype> is 1 for this message type (Gatehouse internal message type 1)
+                                    <date format> as specified above
+                                    <country> is the MMSI country code where the message originates from.
+                                    <region> the MMSI number of the region
+                                    <pss> the MMSI number of the site transponder
+                                    <online data> buffered data from a BSC will be designated with 0. Online data with 1.
+                                    <cc> the checksum value of the following NMEA sentence
+                                    <*hh> checksum as described in /IEC 61162-1/
+                                    <NMEA message> is the NMEA message that follows immediately after the $PGHP sentence 
+                             */
+                            
+                            Console.WriteLine("Message from Gatehouse");
+                            Console.WriteLine("     '" + nmeaLine + "'");
+                            Console.WriteLine(string.Format("   Type: {0}\nDate: {1}\n   Country: {2}\n  Region: {3}\n   MMSI: {4}", nmeaData[1], nmeaData[2], nmeaData[3], nmeaData[4], nmeaData[5]));
+                        }
+                        else if (nmeaLine.StartsWith("!AIVDM"))
+                        {
+                            // contain encoded data
+
+                            Console.WriteLine("Message from Gatehouse");
+                            Console.WriteLine("     '" + nmeaLine + "'");
+                        }
+                        else if (nmeaLine.StartsWith("$PSHI"))
+                        {
+                            // do not contain encoded data
+
+                            Console.WriteLine("Unrecognized identifier: $PSHI");
+                            Console.WriteLine("     '" + nmeaLine + "'");
+                        }
+                        else if (nmeaLine.StartsWith("$GPGGA"))
+                        {
+                            /*
+                             *  Format is:
+                             *  $GPGGA,121505,4807.038,N,01131.324,E,1,08,0,9,133.4,M,46.9,M,,*42
+                                - $GPGGA is the NMEA 0183 sentence ID for the GPS fix data.
+                                - 121505 is the fix taken at 12:15:05 UTC
+                                - 4807.038, N is latitude 48d 07.038'N
+                                - 01131.324,E is longitude 11d 31.324'E
+                                - 1 is the fix quality. The fix quality can have a value between 0 and 3, defined as follows
+                                    - 0=no fix
+                                    - 1=GPS or standard positioning service (SPS) fix
+                                    - 2=DGPS fix
+                                    - 3=Precise positioning service (PPS) fix
+                                - 08 is the number of SV's being tracked
+                                - 0.9 is the horizontal dilution of position (HDOP)
+                                - 133.4,M is the altitude, in meters, above mean sea level
+                                - 46.9,M is the height of the geoid (mean sea level) above the WGS84 ellipsoid
+                                - (empty field) is the DGPS station ID number
+                                - *42 is the checksum field
+                             */
+                            string messageDate, messageLatitude, messageLongitude, messageFixQuality, messageSatellites, messageHorizontalDilution, messageAltitude, messageHeight, messageStationID;
+                            messageDate = nmeaData[1];
+
+                            Console.WriteLine("Recognized Identifier: $GPGGA");
+                        }
+                        else // unrecognized
+                        {
+                            Console.WriteLine("Unrecognized identifier");
+                            Console.WriteLine("     '" + nmeaLine + "'");
+                        }
+                    }
 
 					// Get the rest of the data.
 					client.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0,
