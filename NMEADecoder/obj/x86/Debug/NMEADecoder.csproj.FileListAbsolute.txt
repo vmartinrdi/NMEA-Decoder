@@ -1,0 +1,5 @@
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\NMEADecoder\bin\Debug\NMEADecoder.exe
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\NMEADecoder\bin\Debug\NMEADecoder.pdb
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\NMEADecoder\obj\x86\Debug\ResolveAssemblyReference.cache
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\NMEADecoder\obj\x86\Debug\NMEADecoder.exe
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\NMEADecoder\obj\x86\Debug\NMEADecoder.pdb

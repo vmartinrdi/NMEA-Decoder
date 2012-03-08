@@ -22,14 +22,14 @@ namespace NMEAClient
 
 		// The response from the remote device.
 		private static String response = String.Empty;
-        //private static StreamWriter writeTo;
+        private static StreamWriter writeTo;
 
 		private static void StartClient(string dataString)
 		{
 			// Connect to a remote device.
 			try
 			{
-                //writeTo = new StreamWriter(@"C:\nmeaTestFile.txt", false);
+                writeTo = new StreamWriter(@"C:\nmeaTestFile.txt", false);
                 
 				// Establish the remote endpoint for the socket.
 				// The name of the 
@@ -140,11 +140,11 @@ namespace NMEAClient
 
                     //// There might be more data, so store the data received so far.
                     //state.sb.Append(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
-                    Console.WriteLine(data);
+                    //Console.WriteLine(data);
                     //writeTo.WriteLine(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
 
                     // parse the data into separate lines for decoding
-                    string[] nmeaLines = data.Split(new string[] { @"\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+                    string[] nmeaLines = data.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
                     foreach (string nmeaLine in nmeaLines)
                     {
@@ -167,24 +167,100 @@ namespace NMEAClient
                                     <*hh> checksum as described in /IEC 61162-1/
                                     <NMEA message> is the NMEA message that follows immediately after the $PGHP sentence 
                              */
-                            
-                            Console.WriteLine("Message from Gatehouse");
-                            Console.WriteLine("     '" + nmeaLine + "'");
-                            Console.WriteLine(string.Format("   Type: {0}\nDate: {1}\n   Country: {2}\n  Region: {3}\n   MMSI: {4}", nmeaData[1], nmeaData[2], nmeaData[3], nmeaData[4], nmeaData[5]));
+
+                            if (nmeaData.Length >= 6)
+                            {
+                                Console.WriteLine("Message from Gatehouse");
+                                Console.WriteLine("        '" + nmeaLine + "'");
+                                Console.WriteLine(string.Format("        Type: {0}\n        Date: {1}\n        Country: {2}\n        Region: {3}\n        MMSI: {4}", nmeaData[1], nmeaData[2], nmeaData[3], nmeaData[4], nmeaData[5]));
+
+                                writeTo.WriteLine("Message from Gatehouse");
+                                writeTo.WriteLine("        '" + nmeaLine + "'");
+                                writeTo.WriteLine(string.Format("        Type: {0}\n        Date: {1}\n        Country: {2}\n        Region: {3}\n        MMSI: {4}", nmeaData[1], nmeaData[2], nmeaData[3], nmeaData[4], nmeaData[5]));
+                            }
                         }
                         else if (nmeaLine.StartsWith("!AIVDM"))
                         {
                             // contain encoded data
+                            /*
+                             * Contains encoded data
+                             * Format is:
+                             * !AIVDM,1,1,,A,14eG;o@034o8sd<L9i:a;WF>062D,0*7D
+                             *      - !AIVDM is the NMEA 0183 sentence ID
+                             *      - Number of sentences
+                             *      - Sentence number
+                             *      - Sequential message ID for multi-sentence messages
+                             *      - The AIS channel (A or B)
+                             *      - The encoded data
+                             *      - End of encoded data
+                             *      - NMEA checksum
+                             */
 
-                            Console.WriteLine("Message from Gatehouse");
-                            Console.WriteLine("     '" + nmeaLine + "'");
+                            if (nmeaData.Length == 7)
+                            {
+                                // only interested in encoded data - index 5
+                                string encodedData = nmeaData[5];
+                                string inBinary = "";
+
+                                string mmsi, latitude, longitude;
+
+                                byte[] asciiChars = Encoding.ASCII.GetBytes(encodedData);
+
+                                foreach (byte aChar in asciiChars)
+                                {
+                                    int asciiValue = int.Parse(aChar.ToString());
+
+                                    int tranform = asciiValue - 48;
+                                    if (tranform > 40)
+                                        tranform = tranform - 8;
+
+                                    string binaryValue = Convert.ToString(tranform, 2);
+                                    binaryValue = binaryValue.PadLeft(6, '0');
+
+                                    inBinary += binaryValue;
+                                }
+
+                                uint messageType = Convert.ToUInt32(inBinary.Substring(0, 6), 2);
+                                int convertedLat, convertedLong;
+                                
+
+                                // different formats for different message types - first character is message type
+                                if (messageType == 1 || messageType == 2 || messageType == 3)
+                                {
+                                    try
+                                    {
+                                        // only care about mmsi, lat, and long
+                                        mmsi = Convert.ToUInt32(inBinary.Substring(8, 30), 2).ToString();
+                                        convertedLat = Convert.ToInt32(inBinary.Substring(89, 27), 2) / 600000;
+                                        convertedLong = Convert.ToInt32(inBinary.Substring(60, 28), 2) / 600000;
+
+                                        Console.WriteLine("Position Data");
+                                        Console.WriteLine("        '" + nmeaLine + "'");
+                                        Console.WriteLine(string.Format("        MMSI: {0}\n        Latitude: {1}\n        Longitude: {2}", mmsi, convertedLat.ToString(), convertedLong.ToString()));
+
+                                        writeTo.WriteLine("Position Data");
+                                        writeTo.WriteLine("        '" + nmeaLine + "'");
+                                        writeTo.WriteLine(string.Format("        MMSI: {0}\n        Latitude: {1}\n        Longitude: {2}", mmsi, convertedLat.ToString(), convertedLong.ToString()));
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
+                            }
+                            //else
+                            //{
+                            //    // the sentence was cut off, or the encoded portion of the data contains a comma
+                            //}
                         }
                         else if (nmeaLine.StartsWith("$PSHI"))
                         {
                             // do not contain encoded data
 
                             Console.WriteLine("Unrecognized identifier: $PSHI");
-                            Console.WriteLine("     '" + nmeaLine + "'");
+                            Console.WriteLine("        '" + nmeaLine + "'");
+
+                            writeTo.WriteLine("Unrecognized identifier: $PSHI");
+                            writeTo.WriteLine("        '" + nmeaLine + "'");
                         }
                         else if (nmeaLine.StartsWith("$GPGGA"))
                         {
@@ -207,15 +283,40 @@ namespace NMEAClient
                                 - (empty field) is the DGPS station ID number
                                 - *42 is the checksum field
                              */
-                            string messageDate, messageLatitude, messageLongitude, messageFixQuality, messageSatellites, messageHorizontalDilution, messageAltitude, messageHeight, messageStationID;
-                            messageDate = nmeaData[1];
+                            if (nmeaData.Length >= 15)
+                            {
+                                string messageDate, messageLatitude, messageLongitude, messageFixQuality, messageSatellites, messageHorizontalDilution, messageAltitude, messageHeight, messageStationID;
+                                messageDate = nmeaData[1];
+                                messageFixQuality = nmeaData[6];
+                                messageSatellites = nmeaData[7];
+                                messageHorizontalDilution = nmeaData[8] + "." + nmeaData[9];
+                                messageAltitude = nmeaData[10] + ", " + nmeaData[11];
+                                messageHeight = nmeaData[12] + ", " + nmeaData[13];
+                                messageStationID = nmeaData[14];
 
-                            Console.WriteLine("Recognized Identifier: $GPGGA");
+                                // lat and long are the most important and need to be formatted
+                                string formattedLatitude, formattedLongitude;
+                                formattedLatitude = string.Format("{0}d {1}'{2}", nmeaData[2].Substring(0, 2), nmeaData[2].Substring(2), nmeaData[3]);
+                                formattedLongitude = string.Format("{0}d {1}'{2}", nmeaData[4].Substring(0, 2), nmeaData[4].Substring(2), nmeaData[5]);
+
+                                Console.WriteLine("Recognized Identifier: $GPGGA");
+                                Console.WriteLine("        '" + nmeaLine + "'");
+                                Console.WriteLine(string.Format("        Date: {0}\n        Lat: {1}\n        Long: {2}", messageDate, formattedLatitude, formattedLongitude));
+                                Console.WriteLine(string.Format("        Type: {0}\n        Date: {1}\n        Country: {2}\n        Region: {3}\n        MMSI: {4}", nmeaData[1], nmeaData[2], nmeaData[3], nmeaData[4], nmeaData[5]));
+
+                                writeTo.WriteLine("Recognized Identifier: $GPGGA");
+                                writeTo.WriteLine("        '" + nmeaLine + "'");
+                                writeTo.WriteLine(string.Format("        Date: {0}\n        Lat: {1}\n        Long: {2}", messageDate, formattedLatitude, formattedLongitude));
+                                writeTo.WriteLine(string.Format("        Type: {0}\n        Date: {1}\n        Country: {2}\n        Region: {3}\n        MMSI: {4}", nmeaData[1], nmeaData[2], nmeaData[3], nmeaData[4], nmeaData[5]));
+                            }
                         }
                         else // unrecognized
                         {
-                            Console.WriteLine("Unrecognized identifier");
-                            Console.WriteLine("     '" + nmeaLine + "'");
+                            Console.WriteLine("Unrecognized identifier: '" + nmeaData[0] + "'");
+                            Console.WriteLine("        '" + nmeaLine + "'");
+
+                            writeTo.WriteLine("Unrecognized identifier: '" + nmeaData[0] + "'");
+                            writeTo.WriteLine("        '" + nmeaLine + "'");
                         }
                     }
 

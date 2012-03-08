@@ -1,0 +1,5 @@
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\testing\bin\Debug\testing.exe
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\testing\bin\Debug\testing.pdb
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\testing\obj\x86\Debug\ResolveAssemblyReference.cache
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\testing\obj\x86\Debug\testing.exe
+C:\Users\vmartin\Documents\Projects\MXAK\NMEA-Decoder\testing\obj\x86\Debug\testing.pdb
